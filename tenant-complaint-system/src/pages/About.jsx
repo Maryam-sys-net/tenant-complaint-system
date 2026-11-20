@@ -233,8 +233,17 @@ export default function About() {
         )}
       </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-[#ece8ff] via-[#f4f1ff] to-[#e4ddff] overflow-hidden border-b border-indigo-100/80">
+      {/* Hero Section (Dark Purple Overlay Behind Text on Mobile like Entry.jsx, Curved Split on Desktop) */}
+      <section className="relative bg-[#130e33] lg:bg-gradient-to-br lg:from-[#ece8ff] lg:via-[#f4f1ff] lg:to-[#e4ddff] overflow-hidden border-b border-indigo-100/80">
+        {/* Mobile & Tablet Building Image + Strong Dark Indigo Gradient Under Text */}
+        <div
+          className="lg:hidden absolute inset-0 bg-cover bg-right"
+          style={{ backgroundImage: "url('/building.png')" }}
+        />
+        <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-[#110c2e] via-[#171142]/92 to-[#130e33]/45" />
+        <div className="lg:hidden absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#f7f6fe] via-[#130e33]/35 to-transparent" />
+
+        {/* Desktop Right Curved Building Photo Container */}
         <div className="hidden lg:block absolute inset-y-0 right-0 w-[56%] overflow-hidden">
           <div
             className="w-full h-full bg-cover bg-center rounded-bl-[140px] shadow-inner"
@@ -243,37 +252,40 @@ export default function About() {
           <div className="absolute inset-0 bg-gradient-to-r from-[#f0edff] via-transparent to-transparent w-32" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 md:px-10 py-12 md:py-20">
+        <div className="relative z-10 max-w-7xl mx-auto px-5 sm:px-6 md:px-10 py-14 pb-20 md:py-20">
           <div className="max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#dfd8fc] text-[#3b1c99] text-xs font-bold mb-5">
-              <span className="w-4 h-4 rounded-full bg-[#4c24b5] text-white text-[10px] font-extrabold flex items-center justify-center">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 lg:bg-[#dfd8fc] text-white lg:text-[#3b1c99] backdrop-blur-sm text-xs font-bold mb-5">
+              <span className="w-4 h-4 rounded-full bg-[#6e59f7] lg:bg-[#4c24b5] text-white text-[10px] font-extrabold flex items-center justify-center">
                 i
               </span>
               <span>About Us</span>
             </div>
 
-            <h1 className="text-[34px] sm:text-5xl font-extrabold leading-[1.14] tracking-tight text-slate-900">
+            <h1 className="text-[34px] sm:text-5xl font-extrabold leading-[1.15] tracking-tight text-white lg:text-slate-900">
               <span className="block">About Our</span>
-              <span className="block text-[#4c24b5]">Complaint Management</span>
-              <span className="block text-[#4c24b5]">System</span>
+              <span className="block pb-1 text-transparent bg-clip-text bg-gradient-to-r from-[#a78bfa] via-[#c4b5fd] to-[#818cf8] drop-shadow-[0_2px_16px_rgba(139,92,246,0.45)] lg:text-[#4c24b5] lg:bg-none lg:drop-shadow-none">
+                Complaint Management
+              </span>
+              <span className="block text-white lg:text-[#4c24b5]">System</span>
             </h1>
 
-            <div className="w-12 h-1 rounded-full bg-[#4c24b5] my-5" />
+            <div className="hidden lg:block w-12 h-1 rounded-full bg-[#4c24b5] my-5" />
 
-            <p className="text-sm sm:text-[15px] text-slate-700 leading-relaxed max-w-md">
+            {/* Left Purple Vertical Line + Readable Text (Matches Entry.jsx) */}
+            <div className="mt-6 pl-4 border-l-[3px] border-[#6e59f7] lg:border-none lg:pl-0 max-w-md text-indigo-100/95 lg:text-slate-700 text-sm sm:text-[15px] leading-relaxed font-medium lg:font-normal">
               We are committed to making apartment living better, simpler and
               more responsive at{" "}
-              <strong className="text-slate-900">
+              <strong className="text-white lg:text-slate-900">
                 Asiawu Oyenihun Holdings
               </strong>
               . Our Complaint Management System helps tenants report issues
               easily and allows management to resolve them efficiently.
-            </p>
+            </div>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#4c24b5] to-[#6d28d9] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-indigo-900/20 transition"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#5b46e8] to-[#7c3aed] lg:from-[#4c24b5] lg:to-[#6d28d9] hover:opacity-95 text-white text-sm font-bold shadow-md shadow-indigo-950/50 lg:shadow-indigo-900/20 transition"
               >
                 <span>Get Started</span>
                 <span>→</span>
@@ -284,7 +296,7 @@ export default function About() {
       </section>
 
       {/* Mission, Vision, Values Cards Row */}
-      <section className="max-w-7xl w-full mx-auto px-5 sm:px-6 md:px-10 pt-10 pb-6">
+      <section className="max-w-7xl w-full mx-auto px-5 sm:px-6 md:px-10 pt-8 pb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Our Mission */}
           <div className="bg-[#f0edfc] rounded-2xl p-6 border border-indigo-100/80 flex items-start gap-4">

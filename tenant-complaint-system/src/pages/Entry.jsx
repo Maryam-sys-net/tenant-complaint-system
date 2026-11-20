@@ -9,16 +9,16 @@ export default function Entry() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#ebe6ff] via-[#f2efff] to-[#e4ddff] text-slate-900 font-sans overflow-x-hidden">
       {/* Top Hero + Building Section */}
       <div className="relative bg-[#130e33] text-white pb-36">
-        {/* Building Photo Positioned on the Right */}
+        {/* Building Photo */}
         <div
-          className="absolute inset-0 bg-cover bg-right md:bg-[position:right_center]"
+          className="absolute inset-0 bg-cover bg-center md:bg-[position:right_center]"
           style={{
             backgroundImage: "url('/building.png')",
           }}
         />
 
         {/* Smooth Left-to-Right Dark Indigo Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#110c2e] via-[#171142]/90 to-[#130e33]/40 md:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#110c2e]/90 via-[#171142]/75 to-[#130e33]/35 md:from-[#110c2e] md:via-[#171142]/88 md:to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#ebe6ff] via-[#130e33]/35 to-transparent" />
 
         {/* Top Navbar */}
