@@ -11,17 +11,53 @@ export const STATUSES = ["Pending", "In-Progress", "Resolved"];
 const STORAGE_KEY = "tcms.complaints.v1";
 const SESSION_KEY = "tcms.session.v1";
 const ANN_KEY = "tcms.announcements.v1";
-
-// Replace these values with your original unit surnames and management password
-const UNIT_PASSWORDS = {
-  1: "unit1",
-  2: "unit2",
-  3: "unit3",
-  4: "unit3",
-  5: "unit4",
-};
+const TENANTS_KEY = "tcms.tenants.v1";
 
 const MANAGEMENT_PASSWORD = "manage123";
+
+// Pre-seeded tenant accounts for Units 1–5 (Landlord can edit, replace, or vacate any unit)
+const SEED_TENANTS = [
+  {
+    unit: 1,
+    fullName: "Mr. Adewale Ogunleye",
+    contact: "0803 123 4501",
+    password: "unit1",
+    moveInDate: "2026-01-15",
+    updatedAt: "2026-01-15T09:00:00.000Z",
+  },
+  {
+    unit: 2,
+    fullName: "Mrs. Zainab Abdullahi",
+    contact: "0805 234 5602",
+    password: "unit2",
+    moveInDate: "2026-03-01",
+    updatedAt: "2026-03-01T09:00:00.000Z",
+  },
+  {
+    unit: 3,
+    fullName: "Mr. Chukwudi Okafor",
+    contact: "0806 345 6703",
+    password: "unit3",
+    moveInDate: "2026-05-10",
+    updatedAt: "2026-05-10T09:00:00.000Z",
+  },
+  {
+    unit: 4,
+    fullName: "Miss Funke Balogun",
+    contact: "0809 456 7804",
+    password: "unit4",
+    moveInDate: "2026-07-20",
+    updatedAt: "2026-07-20T09:00:00.000Z",
+  },
+  {
+    unit: 5,
+    fullName: "Alhaji Ibrahim Danjuma",
+    contact: "0802 567 8905",
+    password: "unit5",
+    moveInDate: "2026-09-01",
+    updatedAt: "2026-09-01T09:00:00.000Z",
+  },
+];
 
 const SEED_COMPLAINTS = [
   {
@@ -108,6 +144,81 @@ function loadAnnouncements() {
   }
 }
 
+function loadTenants() {
+  try {
+    const raw = localStorage.getItem(TENANTS_KEY);
+    if (!raw) {
+      localStorage.setItem(TENANTS_KEY, JSON.stringify(SEED_TENANTS));
+      return [...SEED_TENANTS];
+    }
+    return JSON.parse(raw);
+  } catch {
+    return [...SEED_TENANTS];
+  }
+}
+
+function saveTenants(list) {
+  localStorage.setItem(TENANTS_KEY, JSON.stringify(list));
+}
+
+// --- Tenant Provisioning (Landlord Managed) ---
+export async function listTenants() {
+  return loadTenants().sort((a, b) => a.unit - b.unit);
+}
+
+export async function getTenantByUnit(unit) {
+  const unitNum = Number(unit);
+  return loadTenants().find((t) => t.unit === unitNum) || null;
+}
+
+export async function upsertTenant({
+  unit,
+  fullName,
+  contact = "",
+  password,
+  moveInDate = "",
+}) {
+  const unitNum = Number(unit);
+  if (!UNITS.includes(unitNum)) {
+    throw new Error("Select a valid residential unit (1–5).");
+  }
+  const cleanName = String(fullName || "").trim();
+  const cleanPassword = String(password || "").trim();
+  if (cleanName.length < 2) {
+    throw new Error("Enter the tenant's full name.");
+  }
+  if (cleanPassword.length < 4) {
+    throw new Error("Password must be at least 4 characters.");
+  }
+
+  const all = loadTenants();
+  const now = new Date().toISOString();
+  const record = {
+    unit: unitNum,
+    fullName: cleanName,
+    contact: String(contact || "").trim(),
+    password: cleanPassword,
+    moveInDate: moveInDate || now.slice(0, 10),
+    updatedAt: now,
+  };
+
+  const idx = all.findIndex((t) => t.unit === unitNum);
+  if (idx === -1) {
+    all.push(record);
+  } else {
+    all[idx] = record;
+  }
+  saveTenants(all);
+  return record;
+}
+
+export async function removeTenant(unit) {
+  const unitNum = Number(unit);
+  const next = loadTenants().filter((t) => t.unit !== unitNum);
+  saveTenants(next);
+  return next.sort((a, b) => a.unit - b.unit);
+}
+
 // --- Authentication ---
 export function getSession() {
   try {
@@ -120,16 +231,27 @@ export function getSession() {
 
 export async function loginUnit(unit, password) {
   const unitNum = Number(unit);
-  const expected = UNIT_PASSWORDS[unitNum];
+  const tenant = loadTenants().find((t) => t.unit === unitNum);
+  if (!tenant) {
+    throw new Error(
+      `Unit ${unitNum} has no active tenant account yet. Please contact Management.`,
+    );
+  }
   if (
-    !expected ||
     String(password || "")
       .trim()
-      .toLowerCase() !== expected
+      .toLowerCase() !==
+    String(tenant.password || "")
+      .trim()
+      .toLowerCase()
   ) {
-    throw new Error("Incorrect surname password for Unit " + unitNum + ".");
+    throw new Error("Incorrect password for Unit " + unitNum + ".");
   }
-  const session = { role: "tenant", unit: unitNum };
+  const session = {
+    role: "tenant",
+    unit: unitNum,
+    fullName: tenant.fullName,
+  };
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   return session;
 }

@@ -8,6 +8,9 @@ import {
   deleteAnnouncement,
   listAnnouncements,
   listComplaints,
+  listTenants,
+  removeTenant,
+  upsertTenant,
 } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import { formatDate } from "../lib/validation.js";
@@ -42,12 +45,27 @@ export default function ManagementDashboard() {
 
   const [items, setItems] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
+  const [tenants, setTenants] = useState([]);
+
+  // Announcement form state
   const [annTitle, setAnnTitle] = useState("");
   const [annTag, setAnnTag] = useState("Maintenance");
   const [annDetails, setAnnDetails] = useState("");
   const [annError, setAnnError] = useState("");
   const [annMessage, setAnnMessage] = useState("");
   const [postingAnn, setPostingAnn] = useState(false);
+
+  // Tenant provisioning form state
+  const [tenantUnit, setTenantUnit] = useState(1);
+  const [tenantName, setTenantName] = useState("");
+  const [tenantContact, setTenantContact] = useState("");
+  const [tenantPassword, setTenantPassword] = useState("");
+  const [showTenantPw, setShowTenantPw] = useState(false);
+  const [tenantError, setTenantError] = useState("");
+  const [tenantSuccess, setTenantSuccess] = useState("");
+  const [savingTenant, setSavingTenant] = useState(false);
+  const [copiedUnit, setCopiedUnit] = useState(null);
+  const [revealedPasswords, setRevealedPasswords] = useState({});
 
   const [unit, setUnit] = useState("");
   const [status, setStatus] = useState("");
@@ -58,6 +76,7 @@ export default function ManagementDashboard() {
   useEffect(() => {
     listComplaints().then(setItems);
     listAnnouncements().then(setAnnouncements);
+    listTenants().then(setTenants);
   }, []);
 
   const handleLogout = () => {
@@ -96,6 +115,59 @@ export default function ManagementDashboard() {
   const handleDeleteAnnouncement = async (id) => {
     const updated = await deleteAnnouncement(id);
     setAnnouncements(updated);
+  };
+
+  const handleSaveTenant = async (e) => {
+    e.preventDefault();
+    setTenantError("");
+    setTenantSuccess("");
+    setSavingTenant(true);
+    try {
+      const saved = await upsertTenant({
+        unit: tenantUnit,
+        fullName: tenantName,
+        contact: tenantContact,
+        password: tenantPassword,
+      });
+      const updatedList = await listTenants();
+      setTenants(updatedList);
+      setTenantName("");
+      setTenantContact("");
+      setTenantPassword("");
+      setTenantSuccess(
+        `Unit ${saved.unit} account registered for ${saved.fullName}. Copy the credentials below to share with the tenant.`,
+      );
+    } catch (err) {
+      setTenantError(err.message);
+    } finally {
+      setSavingTenant(false);
+    }
+  };
+
+  const handleEditTenant = (t) => {
+    setTenantUnit(t.unit);
+    setTenantName(t.fullName);
+    setTenantContact(t.contact || "");
+    setTenantPassword(t.password);
+    setTenantError("");
+    setTenantSuccess("");
+    setActiveTab("tenants");
+  };
+
+  const handleVacateUnit = async (unitNum) => {
+    const updated = await removeTenant(unitNum);
+    setTenants(updated);
+    setTenantSuccess(`Unit ${unitNum} marked as vacant and login revoked.`);
+  };
+
+  const handleCopyCredentials = (t) => {
+    const loginUrl = `${window.location.origin}/unit/${t.unit}/login`;
+    const msg = `AOH Management Systems — Tenant Portal Login\nTenant: ${t.fullName}\nApartment: Unit ${t.unit}\nLogin Link: ${loginUrl}\nPassword: ${t.password}`;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(msg).catch(() => {});
+    }
+    setCopiedUnit(t.unit);
+    setTimeout(() => setCopiedUnit(null), 2500);
   };
 
   const counts = useMemo(
@@ -204,6 +276,30 @@ export default function ManagementDashboard() {
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "tenants",
+      label: "Tenants",
+      action: () => {
+        setTenantError("");
+        setTenantSuccess("");
+        setActiveTab("tenants");
+      },
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="1.9"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
           />
         </svg>
       ),
@@ -518,6 +614,304 @@ export default function ManagementDashboard() {
           </div>
         </header>
 
+        {/* TAB VIEW: TENANT PROVISIONING (REGISTER & MANAGE TENANT ACCOUNTS) */}
+        {activeTab === "tenants" && (
+          <main className="flex-1 p-5 md:p-7 max-w-6xl w-full mx-auto space-y-6">
+            <div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("dashboard")}
+                className="text-xs font-bold text-[#4c24b5] hover:underline cursor-pointer"
+              >
+                ← Back to Dashboard
+              </button>
+              <h1 className="text-2xl font-extrabold text-slate-900 mt-1">
+                Tenant Accounts & Credentials
+              </h1>
+              <p className="text-sm text-slate-500">
+                Register tenant details and assign unit passwords before sharing
+                login access with residents
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Register / Update Tenant Form */}
+              <div className="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
+                  <div className="w-9 h-9 rounded-full bg-[#ebe6ff] text-[#4c24b5] flex items-center justify-center shrink-0">
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900">
+                      Register / Assign Tenant
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Creates or updates login credentials for a unit
+                    </p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={handleSaveTenant}
+                  className="mt-5 space-y-4"
+                  noValidate
+                >
+                  <div>
+                    <label
+                      htmlFor="tenant-unit"
+                      className="block text-xs font-bold text-slate-700 mb-1.5"
+                    >
+                      Select Apartment Unit *
+                    </label>
+                    <select
+                      id="tenant-unit"
+                      value={tenantUnit}
+                      onChange={(e) => setTenantUnit(Number(e.target.value))}
+                      className="w-full rounded-xl bg-[#f7f6fd] border border-indigo-100 px-4 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white focus:border-[#4c24b5] focus:ring-2 focus:ring-indigo-100 transition"
+                    >
+                      {UNITS.map((u) => {
+                        const existing = tenants.find((t) => t.unit === u);
+                        return (
+                          <option key={u} value={u}>
+                            Unit {u}{" "}
+                            {existing
+                              ? `— Occupied (${existing.fullName})`
+                              : "— Vacant"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="tenant-name"
+                      className="block text-xs font-bold text-slate-700 mb-1.5"
+                    >
+                      Tenant Full Name *
+                    </label>
+                    <input
+                      id="tenant-name"
+                      type="text"
+                      value={tenantName}
+                      onChange={(e) => setTenantName(e.target.value)}
+                      placeholder="e.g. Mr. Abdullahi Suleiman"
+                      className="w-full rounded-xl bg-[#f7f6fd] border border-indigo-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#4c24b5] focus:ring-2 focus:ring-indigo-100 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="tenant-contact"
+                      className="block text-xs font-bold text-slate-700 mb-1.5"
+                    >
+                      Phone Number or Email (Optional)
+                    </label>
+                    <input
+                      id="tenant-contact"
+                      type="text"
+                      value={tenantContact}
+                      onChange={(e) => setTenantContact(e.target.value)}
+                      placeholder="e.g. 0803 000 0000"
+                      className="w-full rounded-xl bg-[#f7f6fd] border border-indigo-100 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-[#4c24b5] focus:ring-2 focus:ring-indigo-100 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="tenant-password"
+                      className="block text-xs font-bold text-slate-700 mb-1.5"
+                    >
+                      Assign Unit Login Password *
+                    </label>
+                    <div className="flex items-center rounded-xl bg-[#f7f6fd] border border-indigo-100 px-4 py-2.5 focus-within:bg-white focus-within:border-[#4c24b5] focus-within:ring-2 focus-within:ring-indigo-100 transition">
+                      <input
+                        id="tenant-password"
+                        type={showTenantPw ? "text" : "password"}
+                        value={tenantPassword}
+                        onChange={(e) => setTenantPassword(e.target.value)}
+                        placeholder="e.g. suleiman1"
+                        className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowTenantPw((prev) => !prev)}
+                        className="text-xs font-bold text-[#4c24b5] ml-2 cursor-pointer"
+                      >
+                        {showTenantPw ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Minimum 4 characters. You will share this password with
+                      the tenant.
+                    </p>
+                  </div>
+
+                  {tenantError && (
+                    <p
+                      role="alert"
+                      className="text-xs font-semibold text-rose-600"
+                    >
+                      {tenantError}
+                    </p>
+                  )}
+
+                  {tenantSuccess && (
+                    <p
+                      role="status"
+                      className="rounded-xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 text-xs font-semibold text-emerald-700"
+                    >
+                      ✓ {tenantSuccess}
+                    </p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={savingTenant}
+                    className="w-full py-3 px-5 rounded-full bg-gradient-to-r from-[#4c24b5] to-[#6338d4] hover:from-[#5832c9] hover:to-[#7044e3] text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-900/15 transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {savingTenant
+                      ? "Saving Tenant..."
+                      : `Save Unit ${tenantUnit} Account`}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: All 5 Units Tenant Directory & Credentials */}
+              <div className="lg:col-span-7 space-y-3.5">
+                {UNITS.map((u) => {
+                  const tenant = tenants.find((t) => t.unit === u);
+                  const isRevealed = Boolean(revealedPasswords[u]);
+
+                  return (
+                    <div
+                      key={u}
+                      className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div className="flex items-start gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-[#ebe6ff] text-[#4c24b5] flex items-center justify-center font-extrabold text-sm shrink-0">
+                          U{u}
+                        </div>
+
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-extrabold text-slate-900">
+                              Unit {u}
+                            </h3>
+                            {tenant ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700">
+                                Active Account
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500">
+                                Vacant
+                              </span>
+                            )}
+                          </div>
+
+                          {tenant ? (
+                            <div className="mt-1 space-y-1">
+                              <p className="text-sm font-bold text-slate-800">
+                                {tenant.fullName}
+                              </p>
+                              {tenant.contact && (
+                                <p className="text-xs text-slate-500">
+                                  Contact: {tenant.contact}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2 pt-0.5">
+                                <span className="text-xs text-slate-500">
+                                  Password:
+                                </span>
+                                <code className="px-2 py-0.5 rounded bg-[#f4f2ff] text-xs font-bold text-[#4c24b5]">
+                                  {isRevealed ? tenant.password : "••••••••"}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRevealedPasswords((prev) => ({
+                                      ...prev,
+                                      [u]: !prev[u],
+                                    }))
+                                  }
+                                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline cursor-pointer"
+                                >
+                                  {isRevealed ? "Hide" : "Show"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500 mt-1">
+                              No tenant registered yet. Assign a tenant using
+                              the form.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {tenant ? (
+                        <div className="flex flex-wrap sm:flex-col items-stretch sm:items-end gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyCredentials(tenant)}
+                            className="px-3.5 py-1.5 rounded-full bg-[#4c24b5] hover:bg-[#3f1c9c] text-white text-xs font-bold transition cursor-pointer"
+                          >
+                            {copiedUnit === u
+                              ? "✓ Copied Login!"
+                              : "Copy Login Info"}
+                          </button>
+
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleEditTenant(tenant)}
+                              className="text-xs font-bold text-[#4c24b5] hover:underline cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleVacateUnit(u)}
+                              className="text-xs font-bold text-rose-500 hover:underline cursor-pointer"
+                            >
+                              Vacate
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTenantUnit(u);
+                            setTenantName("");
+                            setTenantContact("");
+                            setTenantPassword("");
+                          }}
+                          className="self-start sm:self-center px-4 py-2 rounded-full bg-[#f4f2ff] hover:bg-[#e5dffd] text-[#4c24b5] text-xs font-bold transition cursor-pointer shrink-0"
+                        >
+                          + Assign Tenant
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </main>
+        )}
+
         {/* TAB VIEW: UNITS OVERVIEW */}
         {activeTab === "units" && (
           <main className="flex-1 p-5 md:p-7 max-w-6xl w-full mx-auto space-y-6">
@@ -540,6 +934,7 @@ export default function ManagementDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {UNITS.map((u) => {
                 const unitList = (items || []).filter((c) => c.unit === u);
+                const tenant = tenants.find((t) => t.unit === u);
                 const pending = unitList.filter(
                   (c) => c.status === "Pending",
                 ).length;
@@ -566,13 +961,19 @@ export default function ManagementDashboard() {
                               Unit {u}
                             </h2>
                             <p className="text-xs text-slate-500">
-                              Residential Apartment
+                              {tenant ? tenant.fullName : "No tenant assigned"}
                             </p>
                           </div>
                         </div>
 
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                          Occupied
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            tenant
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {tenant ? "Occupied" : "Vacant"}
                         </span>
                       </div>
 
@@ -598,15 +999,36 @@ export default function ManagementDashboard() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openFilteredComplaints({ nextUnit: String(u) })
-                      }
-                      className="w-full py-2.5 px-4 rounded-full bg-[#4c24b5] hover:bg-[#3f1c9c] text-white text-xs font-bold transition cursor-pointer"
-                    >
-                      View Unit {u} Tickets ({unitList.length}) →
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openFilteredComplaints({ nextUnit: String(u) })
+                        }
+                        className="w-full py-2.5 px-4 rounded-full bg-[#4c24b5] hover:bg-[#3f1c9c] text-white text-xs font-bold transition cursor-pointer"
+                      >
+                        View Unit {u} Tickets ({unitList.length}) →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTenantUnit(u);
+                          if (tenant) {
+                            setTenantName(tenant.fullName);
+                            setTenantContact(tenant.contact || "");
+                            setTenantPassword(tenant.password);
+                          } else {
+                            setTenantName("");
+                            setTenantContact("");
+                            setTenantPassword("");
+                          }
+                          setActiveTab("tenants");
+                        }}
+                        className="w-full py-2 px-4 rounded-full bg-[#f4f2ff] hover:bg-[#e7e2fb] text-[#4c24b5] text-xs font-bold transition cursor-pointer"
+                      >
+                        {tenant ? "Manage Tenant Login" : "+ Assign Tenant"}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -635,7 +1057,6 @@ export default function ManagementDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Landlord Post Announcement Form */}
               <div className="lg:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                 <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
                   <div className="w-9 h-9 rounded-full bg-[#ebe6ff] text-[#4c24b5] flex items-center justify-center shrink-0">
@@ -752,7 +1173,6 @@ export default function ManagementDashboard() {
                 </form>
               </div>
 
-              {/* Right Column: Published Announcements List */}
               <div className="lg:col-span-7 space-y-4">
                 {announcements.length === 0 ? (
                   <div className="bg-white rounded-2xl p-8 text-center border border-dashed border-slate-200">
@@ -1360,10 +1780,35 @@ export default function ManagementDashboard() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <button
                       type="button"
-                      onClick={() => openFilteredComplaints({ nextStatus: "" })}
+                      onClick={() => setActiveTab("tenants")}
                       className="flex flex-col items-center justify-center gap-2.5 p-4 rounded-2xl bg-[#f4f2ff] hover:bg-[#e8e3fe] text-slate-800 transition cursor-pointer"
                     >
                       <div className="w-10 h-10 rounded-full bg-[#4c24b5] text-white flex items-center justify-center">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-xs font-bold text-center">
+                        Register Tenant
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openFilteredComplaints({ nextStatus: "" })}
+                      className="flex flex-col items-center justify-center gap-2.5 p-4 rounded-2xl bg-[#f4f2ff] hover:bg-[#e8e3fe] text-slate-800 transition cursor-pointer"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-white text-[#4c24b5] shadow-sm flex items-center justify-center">
                         <svg
                           className="w-5 h-5"
                           fill="none"
@@ -1380,31 +1825,6 @@ export default function ManagementDashboard() {
                       </div>
                       <span className="text-xs font-bold text-center">
                         View Complaints
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("units")}
-                      className="flex flex-col items-center justify-center gap-2.5 p-4 rounded-2xl bg-[#f4f2ff] hover:bg-[#e8e3fe] text-slate-800 transition cursor-pointer"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-white text-[#4c24b5] shadow-sm flex items-center justify-center">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3"
-                          />
-                        </svg>
-                      </div>
-                      <span className="text-xs font-bold text-center">
-                        Manage Units
                       </span>
                     </button>
 
